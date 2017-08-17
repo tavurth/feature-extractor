@@ -1,5 +1,6 @@
 import os
 import json
+import random
 import numpy as np
 from PIL import Image
 from glob import glob
@@ -83,11 +84,39 @@ def extract_features(fileName, **kwargs):
 
     return features
 
+def extract_blocks_around_pts(fileName, pts, **kwargs):
+
+    xOffset = kwargs.get('x_offset', 64)
+    yOffset = kwargs.get('y_offset', 15)
+    blockSize = kwargs.get('block_pixels', 64)
+    halfBlock = int(blockSize / 2)
+
+    # Load the image
+    image = Image.open(fileName)
+
+    # Images have the dimensions:
+    # Width: 384 px
+    # Height: 286 px
+
+    # Get the pixel data as floating point
+    pixels = np.reshape(np.asarray(image.getdata(), dtype=float), (-1, kwargs.get('width', 384))) / kwargs.get('max_alpha', 255.);
+
+    # Slice the top, bottom and sides from the image to create a base2 256x256 image
+    pixels = np.around(pixels, kwargs.get('round_to', 4))
+    #[yOffset:-yOffset, xOffset:-xOffset]
+    blocks = {}
+
+    for ptId in range(len(pts)):
+        pt = pts[ptId]
+        blocks[str(ptId)] = pixels[(pt[1]-halfBlock):(pt[1]+halfBlock), (pt[0]-halfBlock):(pt[0]+halfBlock)].ravel().tolist()
+
+    return blocks
+
 def extract_blocks(fileName, **kwargs):
 
     xOffset = kwargs.get('x_offset', 64)
     yOffset = kwargs.get('y_offset', 15)
-    blockSize = kwargs.get('block_pixels', 8)
+    blockSize = kwargs.get('block_pixels', 64)
 
     # Load the image
     image = Image.open(fileName)
@@ -108,7 +137,7 @@ def extract_blocks(fileName, **kwargs):
 def extract_face_cascades(face, **kwargs):
 
     # How many pixels to use for each feature
-    blockSize = kwargs.get('block_pixels', 8)
+    blockSize = kwargs.get('block_pixels', 64)
 
     # Get the image data as a series of blocks, and the features
     blocks = extract_blocks(face['pgm'], **kwargs)
@@ -130,7 +159,7 @@ def extract_face_cascades(face, **kwargs):
         if not y in dataBlocks[x]:
             dataBlocks[x][y] = { 'features': {} }
 
-        dataBlocks[x][y]['data'] = block.tolist()
+        dataBlocks[x][y]['data'] = block.ravel().tolist()
 
         for xIt in range(blockSize):
             for yIt in range(blockSize):
@@ -151,6 +180,10 @@ def extract_face_cascades(face, **kwargs):
             xPos = 0
 
     return dataBlocks
+
+def extract_snapshots(fileName, **kwargs):
+    points = load_pts(fileName['pts'])
+    return extract_blocks_around_pts(fileName['pgm'], points, **kwargs)
 
 def get_only_features(fileName, **kwargs):
 
@@ -179,9 +212,29 @@ def combine_features(superSet):
 
     return toReturn
 
-COUNTER = 0
+def combine_snapshots(superSet):
+
+    toReturn = {}
+
+    for data in superSet:
+        for key, item in data.items():
+            if not key in toReturn:
+                toReturn[key] = []
+
+            toReturn[key].append(item)
+
+    return toReturn
+
 data = []
-for fileName in glob('./face-data/*.pgm'):
+COUNTER = 0
+files = glob('./face-data/*.pgm')
+
+r = list(range(len(files)))
+random.shuffle(r)
+
+for idx in r:
+
+    fileName = files[idx]
     fileName = os.path.splitext(fileName)[0]
 
     print('Processing', fileName, '...')
@@ -190,12 +243,12 @@ for fileName in glob('./face-data/*.pgm'):
         throw ('Could not find face data for ' + fileName)
 
     data.append(
-        get_only_features({
+        extract_snapshots({
             'pgm': fileName + '.pgm',
             'pts': fileName + '.pts'
         },
-                          round_to=4,
-                          pixel_size=8,
+                          round_to=3,
+                          block_pixels=16,
         )
     )
 
@@ -203,7 +256,9 @@ for fileName in glob('./face-data/*.pgm'):
     if COUNTER > 10:
         break
 
-with open('training.json', 'w') as fout:
-    fout.write(json.dumps(combine_features(data), sort_keys=True, separators=(',',':')))
+with open('index.js', 'w') as fout:
+    prefix = 'let training = '
+    prefix = ''
+    fout.write(prefix + json.dumps(combine_snapshots(data), sort_keys=True, separators=(',',':')))
 
 print('Feature data dumped to file!')
