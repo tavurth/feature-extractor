@@ -18,7 +18,10 @@ def writeImage(name, data):
     print('Saved: features/' + name + '.png')
 
 with open('index.js', 'r') as fin:
-    data = json.loads(fin.read())
+
+    data = fin.read();
+    data = data[data.find('{'):]
+    data = json.loads(data)
 
     for typeName, values in data.items():
         id=0
