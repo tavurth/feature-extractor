@@ -248,7 +248,7 @@ for idx in r:
             'pts': fileName + '.pts'
         },
                           round_to=3,
-                          block_pixels=16,
+                          block_pixels=32,
         )
     )
 
