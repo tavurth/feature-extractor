@@ -253,7 +253,7 @@ for idx in r:
     )
 
     COUNTER += 1
-    if COUNTER > 10:
+    if COUNTER > 20:
         break
 
 with open('index.js', 'w') as fout:
