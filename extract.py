@@ -244,12 +244,11 @@ for idx in r:
 
     data.append(
         extract_snapshots({
+
             'pgm': fileName + '.pgm',
             'pts': fileName + '.pts'
-        },
-                          round_to=3,
-                          block_pixels=32,
-        )
+
+        }, round_to=3, block_pixels=32)
     )
 
     COUNTER += 1
@@ -257,8 +256,7 @@ for idx in r:
         break
 
 with open('index.js', 'w') as fout:
-    prefix = 'let training = '
-    prefix = ''
+    prefix = 'export default '
     fout.write(prefix + json.dumps(combine_snapshots(data), sort_keys=True, separators=(',',':')))
 
 print('Feature data dumped to file!')
